@@ -1,0 +1,146 @@
+---
+title: "Reports_R"
+author: "Jonathan Smiles"
+date: "22 October 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(tidyverse)
+library(readxl)
+library(ggplot2)
+```
+
+## Example R Report
+Reporting is important for most organisations. Often those not working with data directly still require certain metrics and KPIs on a daily, weekly, monthly or even annual basis. It is not possible to predict all possible ad hoc report requests. However, it is desirable to automate all or part of the regular report generation process. This example shows how you can automate the reading, parsing, cleaning, analysis and plotting of certain data that is required. This process creates a report in html. However, it can easily be adapated to output PDF or Word documents. The data used for this example comes from the Office for National Statistics. Namely, it looks at employment data in the United Kingdom. This data is released monthly. <https://www.ons.gov.uk/employmentandlabourmarket/peopleinwork/employmentandemployeetypes/datasets/fulltimeparttimeandtemporaryworkersseasonallyadjustedemp01sa>
+
+
+**Note**: in a real reporting situation you would probably select "echo=FALSE" within the code chunks. This is because most end users don't care about the code used to create their reports. However, I have left the code chunks in place to demonstrate this functionality.
+
+
+
+```{r, echo=TRUE}
+# Read the data from our xls file
+# Note: this file name changes from month to month, so will need to be changed
+emp01 <- read_xls("emp01saoct2017.xls", skip=8)
+
+# Omit all na's, rename the columns to something meaningful and drop
+# the columns not required for this report
+emp01 <- emp01 %>%
+          na.omit() %>%
+          rename(date = X__1, total_emp = X__2,
+                 emp = X__3, self_emp =X__4, 
+                 ft_emp = X__7, pt_emp = X__8) %>%
+          select(date, total_emp, emp, self_emp, 
+                 ft_emp, pt_emp)
+
+# Add an index to the data frame
+emp01$date_id <- seq.int(nrow(emp01))
+
+```
+
+## Self-employment
+
+The chart below plots the total number of people in self-employment since 1992. It would seem from looking that there has been a dramatic change in self employment since this time period. This trend is especially evident since around the year 2002. So can we make this inference? Is self employment increasing significantly?
+
+```{r, echo=TRUE}
+
+ggplot(emp01, aes(x=date_id, y=(self_emp/1000000))) +
+        geom_line() +
+        labs(x = "Monthly figure from May 1992 to Present",
+             y = "Self-employment in Millions",
+             title = "Change in Self-employment over time")
+
+```
+
+
+## Employment Comparison
+
+To answer the  I have plotted the same data but this time I have compared to the growth in all other types of employment other than self employment. As we can see, this plot puts things into perspective. Firstly, self employment remains a minority activity. Furthermore, while self employment has grown all other types of employment have grown significantly faster. 
+
+
+```{r, echo=TRUE}
+
+ggplot(data = emp01, aes(x=date_id)) +
+        geom_line(aes(y=((total_emp-self_emp)/1000000)), colour="blue") +
+        geom_line(aes(y=(self_emp/1000000)), colour="red") +
+        labs(x = "Monthly figure from May 1992 to Present",
+             y = "Red: Self-employment in millions
+             \n Blue: All other employment in millions",
+             title = "Comparison between Self-employment and all other forms of employment over time")
+
+```
+
+## Embedding Text Values
+
+```{r, echo=TRUE}
+
+# Current Self Employment
+val1 <- emp01 %>%
+          filter(date_id == nrow(emp01)) %>%
+          select(self_emp)
+
+date1 <- emp01 %>%
+          filter(date_id == nrow(emp01)) %>%
+          select(date)
+
+# Last years figures
+val2 <- emp01 %>%
+          filter(date_id == nrow(emp01)-12) %>%
+          select(self_emp)
+
+date2 <- emp01 %>%
+          filter(date_id == nrow(emp01)-12) %>%
+          select(date)
+
+# Difference
+val3 = val1 - val2
+
+# Percentage Change
+val4 =round((val3/val2)*100)
+
+# Figures for total employment
+val5 <- emp01 %>%
+          filter(date_id == nrow(emp01)) %>%
+          select(total_emp)
+
+val6 <- emp01 %>%
+          filter(date_id == nrow(emp01)-12) %>%
+          select(total_emp)
+
+val7 = val5 - val6
+
+val8 =round((val7/val6)*100)
+
+
+
+```
+
+
+If you want to embed dynamic values in a report you must first create the values, then you can call them in text such as the following. The dates and values below are dynamic while the rest of the text is static. 
+
+
+### Self-employment figures
++ In the period `r date1` there were `r round((val1/1000000), digits=2)` million people self-employed
++ In the period `r date2` there were `r round((val2/1000000), digits=2)` million people self-employed
++ Over the past 12 months  there was an increase of `r round((val3/1000), digits=0)` thousand people in self-employment 
++ This represents a change of `r val4`%
+
+### Total employment figures
++ In the period `r date1` there were `r round((val5/1000000), digits=2)` million people employed
++ In the period `r date2` there were `r round((val6/1000000), digits=2)` million people employed
++ Over the past 12 months  there was an increase of `r round((val7/1000), digits=0)` thousand people in employment 
++ This represents a change of `r val8`%
+
+
+
+
+
+
+
+
+
+
+
+
